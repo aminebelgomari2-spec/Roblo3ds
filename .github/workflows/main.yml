@@ -28,10 +28,6 @@ jobs:
           unzip -o makerom-v0.18-ubuntu_x86_64.zip makerom -d /opt/devkitpro/tools/bin
           chmod a+x /opt/devkitpro/tools/bin/makerom /opt/devkitpro/tools/bin/bannertool
 
-      - name: Installer citro2d (a besoin de citro3d + libctru)
-        run: |
-          dkp-pacman -Sy --noconfirm --needed 3ds-citro2d
-
       - name: Compiler (.elf + .3dsx)
         run: |
           make
