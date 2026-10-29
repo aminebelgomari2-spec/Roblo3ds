@@ -1,0 +1,136 @@
+BasicInfo:
+  Title                   : Roblo3DS
+  CompanyCode             : 00
+  ProductCode             : CTR-H-RBLX
+  # Logo omis : homebrew, pas de logo Nintendo. Doit rester coherent avec
+  # tools/make_cia.sh et le Makefile (TARGET=Roblo3DS, UniqueId=0xc7a23).
+
+TitleInfo:
+  Category                : Application
+  UniqueId                : 0xc7a23
+  Version                 : 0
+
+Option:
+  UseOnSD                 : true # app installable sur la carte SD
+  FreeProductCode         : true
+  MediaFootPadding        : false
+  EnableCrypt             : false
+  EnableCompress          : true
+
+AccessControlInfo:
+  CoreVersion             : 2
+  DescVersion             : 2
+
+  # Noyau 2.33 (compatible toutes 3DS >= 4.5)
+  ReleaseKernelMajor      : "02"
+  ReleaseKernelMinor      : "33"
+
+  # ExtData
+  UseExtSaveData          : false
+
+  # Acces FS. DirectSdmc : autorise l'acces direct a la carte SD.
+  FileSystemAccess:
+    - DirectSdmc
+
+  # Process Settings
+  MemoryType              : Application
+  SystemMode              : 64MB # 3DS normale = 128 Mo RAM physiques, exheader 64MB (application)
+  IdealProcessor          : 0
+  AffinityMask            : 1
+  Priority                : 16
+  MaxCpu                  : 0
+  HandleTableSize         : 0x200
+  DisableDebug            : false
+  EnableForceDebug        : false
+  CanWriteSharedPage      : false
+  CanUsePrivilegedPriority: false
+  CanUseNonAlphabetAndNumber: true
+  PermitMainFunctionArgument: true
+  CanShareDeviceMemory    : true
+  RunnableOnSleep         : false
+  SpecialMemoryArrange    : true
+
+  # New3DS uniquement (Legacy = on suit le SystemMode du dessus, 268 MHz = 3DS normale)
+  SystemModeExt           : Legacy
+  CpuSpeed                : 268MHz
+  EnableL2Cache           : false
+  CanAccessCore2          : false
+
+  # Services utilises par l'app (pas de reseau -> pas de soc:U ni ac:u).
+  # APT:U / hid / gsp / fs suffisent pour un jeu sans WiFi.
+  ServiceAccessControl:
+    - APT:U
+    - cfg:u
+    - fs:USER
+    - gsp::Gpu
+    - hid:USER
+
+  # Liste COMPLETE des calls systeme autorises (format : Nom: ID)
+  SystemCallAccess:
+    ControlMemory: 1
+    QueryMemory: 2
+    ExitProcess: 3
+    GetThreadPriority: 11
+    SetThreadPriority: 12
+    GetThreadIdealProcessor: 15
+    SleepThread: 10
+    CreateThread: 8
+    ExitThread: 9
+    GetCurrentProcessorNumber: 17
+    SetTimer: 27
+    CreateMutex: 19
+    ReleaseMutex: 20
+    CreateSemaphore: 21
+    ReleaseSemaphore: 22
+    CreateEvent: 23
+    SignalEvent: 24
+    ClearEvent: 25
+    CreateTimer: 26
+    CancelTimer: 28
+    ClearTimer: 29
+    CreateMemoryBlock: 30
+    MapMemoryBlock: 31
+    UnmapMemoryBlock: 32
+    CreateAddressArbiter: 33
+    ArbitrateAddress: 34
+    CloseHandle: 35
+    WaitSynchronization1: 36
+    WaitSynchronizationN: 37
+    GetSystemTick: 40
+    GetHandleInfo: 41
+    GetSystemInfo: 42
+    GetProcessInfo: 43
+    GetThreadInfo: 44
+    ConnectToPort: 45
+    SendSyncRequest1: 46
+    SendSyncRequest2: 47
+    SendSyncRequest3: 48
+    SendSyncRequest4: 49
+    SendSyncRequest: 50
+    DuplicateHandle: 39
+    GetProcessId: 53
+    GetProcessIdOfThread: 54
+    GetThreadId: 55
+    GetResourceLimit: 56
+    GetResourceLimitLimitValues: 57
+    GetResourceLimitCurrentValues: 58
+    GetThreadContext: 59
+    Break: 60
+    OutputDebugString: 61
+    GetProcessIdealProcessor: 6
+    Backdoor: 123
+
+SystemControlInfo:
+  SaveDataSize: 0K
+  RemasterVersion: 0
+  StackSize: 0x40000
+
+  # Modules requis (services listes ci-dessus). Ne pas lister un module
+  # absent du systeme -> l'app resterait bloquee sur l'ecran d'accent circonflexe.
+  Dependency:
+    cfg: 0x0004013000001702
+    dsp: 0x0004013000001a02
+    gsp: 0x0004013000001c02
+    hid: 0x0004013000001d02
+    ps: 0x0004013000003102
+    ptm: 0x0004013000002202
