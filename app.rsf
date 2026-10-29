@@ -2,8 +2,7 @@ BasicInfo:
   Title                   : Roblo3DS
   CompanyCode             : 00
   ProductCode             : CTR-H-RBLX
-  # Logo omis : homebrew, pas de logo Nintendo. Doit rester coherent avec
-  # tools/make_cia.sh et le Makefile (TARGET=Roblo3DS, UniqueId=0xc7a23).
+  Logo                    : Homebrew
 
 TitleInfo:
   Category                : Application
@@ -11,7 +10,7 @@ TitleInfo:
   Version                 : 0
 
 Option:
-  UseOnSD                 : true # app installable sur la carte SD
+  UseOnSD                 : true
   FreeProductCode         : true
   MediaFootPadding        : false
   EnableCrypt             : false
@@ -21,28 +20,45 @@ AccessControlInfo:
   CoreVersion             : 2
   DescVersion             : 2
 
-  # Noyau 2.33 (compatible toutes 3DS >= 4.5)
   ReleaseKernelMajor      : "02"
-  ReleaseKernelMinor      : "33"
+  ReleaseKernelMinor      : "46"
 
-  # ExtData
   UseExtSaveData          : false
 
-  # Acces FS. DirectSdmc : autorise l'acces direct a la carte SD.
   FileSystemAccess:
+    - CategorySystemApplication
+    - CategoryHardwareCheck
+    - CategoryFileSystemTool
+    - Debug
+    - TwlCardBackup
+    - TwlNandData
+    - Boss
     - DirectSdmc
+    - Core
+    - CtrNandRo
+    - CtrNandRw
+    - CtrNandRoWrite
+    - CategorySystemSettings
+    - CardBoard
+    - ExportImportIvs
+    - DirectSdmcWrite
+    - SwitchCleanup
+    - SaveDataMove
+    - Shop
+    - Shell
+    - CategoryHomeMenu
+    - SeedDB
 
-  # Process Settings
   MemoryType              : Application
-  SystemMode              : 64MB # 3DS normale = 128 Mo RAM physiques, exheader 64MB (application)
+  SystemMode              : 64MB
   IdealProcessor          : 0
   AffinityMask            : 1
   Priority                : 16
-  MaxCpu                  : 0
+  MaxCpu                  : 0x9E
   HandleTableSize         : 0x200
   DisableDebug            : false
   EnableForceDebug        : false
-  CanWriteSharedPage      : false
+  CanWriteSharedPage      : true
   CanUsePrivilegedPriority: false
   CanUseNonAlphabetAndNumber: true
   PermitMainFunctionArgument: true
@@ -50,34 +66,35 @@ AccessControlInfo:
   RunnableOnSleep         : false
   SpecialMemoryArrange    : true
 
-  # New3DS uniquement (Legacy = on suit le SystemMode du dessus, 268 MHz = 3DS normale)
   SystemModeExt           : Legacy
   CpuSpeed                : 268MHz
   EnableL2Cache           : false
   CanAccessCore2          : false
 
-  # Services utilises par l'app (pas de reseau -> pas de soc:U ni ac:u).
-  # APT:U / hid / gsp / fs suffisent pour un jeu sans WiFi.
-  ServiceAccessControl:
-    - APT:U
-    - cfg:u
-    - fs:USER
-    - gsp::Gpu
-    - hid:USER
+  IORegisterMapping:
+    - 1ff00000-1ff7ffff
+  MemoryMapping:
+    - 1f000000-1f5fffff:r
 
-  # Liste COMPLETE des calls systeme autorises (format : Nom: ID)
   SystemCallAccess:
     ControlMemory: 1
     QueryMemory: 2
     ExitProcess: 3
-    GetThreadPriority: 11
-    SetThreadPriority: 12
-    GetThreadIdealProcessor: 15
-    SleepThread: 10
+    GetProcessAffinityMask: 4
+    SetProcessAffinityMask: 5
+    GetProcessIdealProcessor: 6
+    SetProcessIdealProcessor: 7
     CreateThread: 8
     ExitThread: 9
+    SleepThread: 10
+    GetThreadPriority: 11
+    SetThreadPriority: 12
+    GetThreadAffinityMask: 13
+    SetThreadAffinityMask: 14
+    GetThreadIdealProcessor: 15
+    SetThreadIdealProcessor: 16
     GetCurrentProcessorNumber: 17
-    SetTimer: 27
+    Run: 18
     CreateMutex: 19
     ReleaseMutex: 20
     CreateSemaphore: 21
@@ -86,6 +103,7 @@ AccessControlInfo:
     SignalEvent: 24
     ClearEvent: 25
     CreateTimer: 26
+    SetTimer: 27
     CancelTimer: 28
     ClearTimer: 29
     CreateMemoryBlock: 30
@@ -96,6 +114,8 @@ AccessControlInfo:
     CloseHandle: 35
     WaitSynchronization1: 36
     WaitSynchronizationN: 37
+    SignalAndWait: 38
+    DuplicateHandle: 39
     GetSystemTick: 40
     GetHandleInfo: 41
     GetSystemInfo: 42
@@ -107,7 +127,8 @@ AccessControlInfo:
     SendSyncRequest3: 48
     SendSyncRequest4: 49
     SendSyncRequest: 50
-    DuplicateHandle: 39
+    OpenProcess: 51
+    OpenThread: 52
     GetProcessId: 53
     GetProcessIdOfThread: 54
     GetThreadId: 55
@@ -117,16 +138,66 @@ AccessControlInfo:
     GetThreadContext: 59
     Break: 60
     OutputDebugString: 61
-    GetProcessIdealProcessor: 6
+    ControlPerformanceCounter: 62
+    CreatePort: 71
+    CreateSessionToPort: 72
+    CreateSession: 73
+    AcceptSession: 74
+    ReplyAndReceive1: 75
+    ReplyAndReceive2: 76
+    ReplyAndReceive3: 77
+    ReplyAndReceive4: 78
+    ReplyAndReceive: 79
+    BindInterrupt: 80
+    UnbindInterrupt: 81
+    InvalidateProcessDataCache: 82
+    StoreProcessDataCache: 83
+    FlushProcessDataCache: 84
+    StartInterProcessDma: 85
+    StopDma: 86
+    GetDmaState: 87
+    RestartDma: 88
+    DebugActiveProcess: 96
+    BreakDebugProcess: 97
+    TerminateDebugProcess: 98
+    GetProcessDebugEvent: 99
+    ContinueDebugEvent: 100
+    GetProcessList: 101
+    GetThreadList: 102
+    GetDebugThreadContext: 103
+    SetDebugThreadContext: 104
+    QueryDebugProcessMemory: 105
+    ReadProcessMemory: 106
+    WriteProcessMemory: 107
+    SetHardwareBreakPoint: 108
+    GetDebugThreadParam: 109
+    ControlProcessMemory: 112
+    MapProcessMemory: 113
+    UnmapProcessMemory: 114
+    CreateCodeSet: 115
+    CreateProcess: 117
+    TerminateProcess: 118
+    SetProcessResourceLimits: 119
+    CreateResourceLimit: 120
+    SetResourceLimitValues: 121
+    AddCodeSegment: 122
     Backdoor: 123
+    KernelSetState: 124
+    QueryProcessMemory: 125
+
+  ServiceAccessControl:
+    - APT:U
+    - cfg:u
+    - fs:USER
+    - gsp::Gpu
+    - gsp::Lcd
+    - hid:USER
 
 SystemControlInfo:
   SaveDataSize: 0K
   RemasterVersion: 0
   StackSize: 0x40000
 
-  # Modules requis (services listes ci-dessus). Ne pas lister un module
-  # absent du systeme -> l'app resterait bloquee sur l'ecran d'accent circonflexe.
   Dependency:
     cfg: 0x0004013000001702
     dsp: 0x0004013000001a02
