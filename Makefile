@@ -3,12 +3,17 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 
+#---------------------------------------------------------------------------------
+# Regles officielles devkitARM : creation de .smdh, .3dsx, .elf, bin2o, etc.
+#---------------------------------------------------------------------------------
+include $(DEVKITARM)/3ds_rules
+
 ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=$$DEVKITPRO/devkitARM")
 endif
 
 #---------------------------------------------------------------------------------
-# Nom cible : cohérent avec app.rsf (Title: Roblo3DS), tools/make_cia.sh et build.yml
+# Nom cible : coherent avec app.rsf (Title: Roblo3DS), tools/make_cia.sh et build.yml
 #---------------------------------------------------------------------------------
 TARGET       :=  Roblo3DS
 BUILD        :=  build
