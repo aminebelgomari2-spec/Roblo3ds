@@ -1,0 +1,67 @@
+name: Build Roblo3DS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
+      options: --user root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer makerom, bannertool et qrencode
+        run: |
+          apt-get update
+          apt-get install -y wget unzip qrencode
+          wget -q https://github.com/diasurgical/bannertool/releases/download/1.2.0/bannertool.zip
+          unzip -j bannertool.zip "linux-x86_64/bannertool" -d /opt/devkitpro/tools/bin
+          wget -q https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18/makerom-v0.18-ubuntu_x86_64.zip
+          unzip -o makerom-v0.18-ubuntu_x86_64.zip makerom -d /opt/devkitpro/tools/bin
+          chmod a+x /opt/devkitpro/tools/bin/makerom /opt/devkitpro/tools/bin/bannertool
+
+      - name: Installer citro2d (a besoin de citro3d + libctru)
+        run: |
+          dkp-pacman -Sy --noconfirm --needed 3ds-citro2d
+
+      - name: Compiler (.elf + .3dsx)
+        run: |
+          make
+
+      - name: Generer le CIA
+        run: |
+          make cia
+
+      - name: Generer le QR code d'installation FBI
+        run: |
+          qrencode -o Roblo3DS_QR.png -s 8 -m 3 "https://github.com/${{ github.repository }}/releases/download/latest/Roblo3DS.cia"
+
+      - name: Artifacts (telechargeables depuis l'onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roblo3DS-build
+          path: |
+            Roblo3DS.3dsx
+            Roblo3DS.smdh
+            Roblo3DS.cia
+            Roblo3DS_QR.png
+          if-no-files-found: error
+
+      - name: Publication dans les Releases (tag fixe "latest")
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Roblo3DS (latest)
+          files: |
+            Roblo3DS.3dsx
+            Roblo3DS.cia
+            Roblo3DS_QR.png
