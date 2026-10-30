@@ -103,6 +103,29 @@ static C3D_RenderTarget *g_top;
 static C3D_RenderTarget *g_bottom;
 static C2D_TextBuf       g_tbuf;
 
+/*============================ Menu & chapeaux ===========================*/
+
+/* etats : menu (choix chapeau) ou en jeu */
+static bool inMenu  = true;
+static float menuSpin = 0.0f;
+
+typedef struct {
+    const char* name;
+    u32  col;        /* couleur principale du chapeau */
+    bool hasVisor;   /* casquette : visiere devant */
+    bool isCrown;    /* couronne : bandeau + pointes */
+    bool isTall;     /* haut de forme : haut cylindrique */
+} Hat;
+
+static const Hat hats[4] = {
+    { "Aucun",         C2D_Color32(0, 0, 0, 0),         false, false, false },
+    { "Casquette",     C2D_Color32(214, 58, 58, 255),   true,  false, false },
+    { "Couronne",      C2D_Color32(250, 204, 60, 255),  false, true,  false },
+    { "Haut de forme", C2D_Color32(30, 30, 36, 255),    false, false, true  },
+};
+static const int HAT_COUNT = 4;
+static int hatIdx = 0;
+
 /*============================ Couleurs ===========================*/
 
 #define CLR_CIEL     C2D_Color32(92, 169, 232, 255)
@@ -311,19 +334,6 @@ static void computeCameraBasis(void)
 }
 
 /*============================ Rendu 3D ===========================*/
-
-/* projette un point monde -> ecran. Renvoie false si derriere la camera. */
-static bool projectPoint(float wx, float wy, float wz, float* px, float* py)
-{
-    float vx = wx - g_camX, vy = wy - g_camY, vz = wz - g_camZ;
-    float x0 = vx * g_rightX + vy * g_rightY + vz * g_rightZ;
-    float y0 = vx * g_upX + vy * g_upY + vz * g_upZ;
-    float z0 = vx * g_fwdX + vy * g_fwdY + vz * g_fwdZ;
-    if (z0 < 0.08f) return false;
-    *px = 200.0f + (x0 / z0) * FOCAL;
-    *py = 120.0f - (y0 / z0) * FOCAL;
-    return true;
-}
 
 /* plan proche pour le clipping des faces (bloc/perso passes si proche
    de la camera qu'un coin se retrouve derriere elle) */
@@ -578,6 +588,41 @@ static void drawBoxYaw(float cx, float cy, float cz, float sx, float sy, float s
 
 /*============================ Personnage ===========================*/
 
+/* chapeau du perso : dessine au-dessus de la tete, oriente comme lui */
+static void drawHat(void)
+{
+    const Hat* h = &hats[hatIdx];
+    float fx = sinf(plYaw), fz = cosf(plYaw); /* avant du corps */
+    float topY = plPos.y + 1.80f;             /* sommet de la tete */
+
+    if (hatIdx == 0) return;
+
+    if (h->isCrown) {
+        /* bandeau + 3 pointes or alignees avant/centre/arriere */
+        drawBoxYaw(plPos.x, topY + 0.07f, plPos.z, 0.50f, 0.14f, 0.50f, plYaw, 1.0f,
+                   h->col, h->col, h->col);
+        drawBoxYaw(plPos.x - fx * 0.15f, topY + 0.20f, plPos.z - fz * 0.15f,
+                   0.10f, 0.15f, 0.10f, plYaw, 1.0f, h->col, h->col, h->col);
+        drawBoxYaw(plPos.x, topY + 0.20f, plPos.z,
+                   0.10f, 0.15f, 0.10f, plYaw, 1.0f, h->col, h->col, h->col);
+        drawBoxYaw(plPos.x + fx * 0.15f, topY + 0.20f, plPos.z + fz * 0.15f,
+                   0.10f, 0.15f, 0.10f, plYaw, 1.0f, h->col, h->col, h->col);
+    } else if (h->isTall) {
+        /* haut de forme : rebord large + cylindre haut */
+        drawBoxYaw(plPos.x, topY + 0.03f, plPos.z, 0.66f, 0.06f, 0.66f, plYaw, 1.0f,
+                   h->col, h->col, h->col);
+        drawBoxYaw(plPos.x, topY + 0.29f, plPos.z, 0.40f, 0.48f, 0.40f, plYaw, 1.0f,
+                   h->col, h->col, h->col);
+    } else {
+        /* casquette : calotte + visiere vers l'avant du corps */
+        drawBoxYaw(plPos.x, topY + 0.06f, plPos.z, 0.50f, 0.12f, 0.50f, plYaw, 1.0f,
+                   h->col, h->col, h->col);
+        drawBoxYaw(plPos.x + fx * 0.32f, topY + 0.02f, plPos.z + fz * 0.32f,
+                   0.44f, 0.05f, 0.26f, plYaw, 1.0f,
+                   h->col, h->col, h->col);
+    }
+}
+
 static void drawPlayer(void)
 {
     float swing = sinf(walkPhase) * 0.10f;
@@ -588,23 +633,24 @@ static void drawPlayer(void)
     /* axe lateral du corps (perpendiculaire a son regard) */
     float brx = cosf(plYaw), brz = -sinf(plYaw);
 
-    /* jambes : DEUX jambes separees (avant : une seule boite = "une jambe") */
-    drawBoxYaw(plPos.x - brx * 0.10f, plPos.y + 0.30f, plPos.z - brz * 0.10f,
-               0.22f, 0.60f, 0.24f, plYaw, 1.0f, pants, pants, pants);
-    drawBoxYaw(plPos.x + brx * 0.10f, plPos.y + 0.30f, plPos.z + brz * 0.10f,
-               0.22f, 0.60f, 0.24f, plYaw, 1.0f, pants, pants, pants);
-    /* torse */
-    drawBoxYaw(plPos.x, plPos.y + 1.05f, plPos.z, 0.60f, 0.90f, 0.34f, plYaw, 1.0f,
+    /* jambes : DEUX jambes separees, bien visibles (0 a 0.60) */
+    drawBoxYaw(plPos.x - brx * 0.13f, plPos.y + 0.30f, plPos.z - brz * 0.13f,
+               0.22f, 0.60f, 0.26f, plYaw, 1.0f, pants, pants, pants);
+    drawBoxYaw(plPos.x + brx * 0.13f, plPos.y + 0.30f, plPos.z + brz * 0.13f,
+               0.22f, 0.60f, 0.26f, plYaw, 1.0f, pants, pants, pants);
+    /* torse (0.60 a 1.35) */
+    drawBoxYaw(plPos.x, plPos.y + 0.98f, plPos.z, 0.56f, 0.75f, 0.32f, plYaw, 1.0f,
                shadeColor(shirt, 0.8f), shirt, shirt);
-    /* tete */
-    drawBoxYaw(plPos.x, plPos.y + 1.65f, plPos.z, 0.52f, 0.52f, 0.52f, plYaw, 1.0f,
+    /* bras : un de chaque cote (5-tes aux epaules), balancement oppose */
+    drawBoxYaw(plPos.x - brx * 0.40f, plPos.y + 0.98f + swing * 0.5f, plPos.z - brz * 0.40f,
+               0.20f, 0.78f, 0.26f, plYaw, 1.0f, skin, skin, skin);
+    drawBoxYaw(plPos.x + brx * 0.40f, plPos.y + 0.98f - swing * 0.5f, plPos.z + brz * 0.40f,
+               0.20f, 0.78f, 0.26f, plYaw, 1.0f, skin, skin, skin);
+    /* tete (1.35 a 1.80) */
+    drawBoxYaw(plPos.x, plPos.y + 1.58f, plPos.z, 0.45f, 0.45f, 0.45f, plYaw, 1.0f,
                skin, skin, skin);
-    /* bras : un de chaque cote du torse (plus "dans" le corps),
-       qui se balancent en sens opposition pendant la marche */
-    drawBoxYaw(plPos.x - brx * 0.42f, plPos.y + 1.08f + swing * 0.5f, plPos.z - brz * 0.42f,
-               0.20f, 0.80f, 0.24f, plYaw, 1.0f, skin, skin, skin);
-    drawBoxYaw(plPos.x + brx * 0.42f, plPos.y + 1.08f - swing * 0.5f, plPos.z + brz * 0.42f,
-               0.20f, 0.80f, 0.24f, plYaw, 1.0f, skin, skin, skin);
+    /* chapeau choisi dans le menu */
+    drawHat();
 }
 
 /*============================ Texte ===========================*/
@@ -687,6 +733,64 @@ static void drawHotbar(void)
 }
 
 /*============================ Buffers de rendu par scene ===========================*/
+
+/* rectangle touche ? (x0,y0)-(x1,y1) sur l'ecran du bas */
+static bool tapRect(u32 kDown, const touchPosition* t, float x0, float y0, float x1, float y1)
+{
+    if (!(kDown & KEY_TOUCH)) return false;
+    return (float)t->px >= x0 && (float)t->px <= x1 &&
+           (float)t->py >= y0 && (float)t->py <= y1;
+}
+
+static void drawMenuTop(void)
+{
+    C2D_TargetClear(g_top, CLR_CIEL);
+    C2D_SceneBegin(g_top);
+
+    /* petit sol sous l'aperçu du perso */
+    {
+        Vec3 v[4];
+        v[0].x = plPos.x - 6.0f; v[0].y = 1.0f; v[0].z = plPos.z - 6.0f;
+        v[1].x = plPos.x + 6.0f; v[1].y = 1.0f; v[1].z = plPos.z - 6.0f;
+        v[2].x = plPos.x - 6.0f; v[2].y = 1.0f; v[2].z = plPos.z + 6.0f;
+        v[3].x = plPos.x + 6.0f; v[3].y = 1.0f; v[3].z = plPos.z + 6.0f;
+        drawQuad3D(v, C2D_Color32(88, 184, 92, 255), depthFor(plPos.x, 1.0f, plPos.z));
+    }
+
+    /* le perso tourne lentement, avec le chapeau selectionne */
+    drawPlayer();
+
+    drawTextShadow("Roblo3DS", 160.0f, 8.0f, 0.62f, C2D_Color32(255, 240, 130, 255), 1);
+    drawTextShadow(hats[hatIdx].name, 160.0f, 40.0f, 0.52f, C2D_Color32(255, 230, 110, 255), 1);
+    drawTextShadow("A / START / bouton JOUER pour jouer", 160.0f, 214.0f, 0.40f, CLR_TEXTE, 1);
+}
+
+static void drawMenuBottom(void)
+{
+    u32 btnGreen = C2D_Color32(88, 184, 92, 255);
+    u32 btnBlue  = C2D_Color32(66, 132, 196, 255);
+    u32 white    = C2D_Color32(255, 255, 255, 255);
+
+    C2D_TargetClear(g_bottom, CLR_FOND_BAS);
+    C2D_SceneBegin(g_bottom);
+
+    /* gros bouton JOUER */
+    C2D_DrawRectSolid(60.0f, 26.0f, 0.2f, 200.0f, 58.0f, btnGreen);
+    C2D_DrawRectSolid(60.0f, 26.0f, 0.35f, 200.0f, 4.0f, white);
+    C2D_DrawRectSolid(60.0f, 80.0f, 0.35f, 200.0f, 4.0f, white);
+    C2D_DrawRectSolid(60.0f, 26.0f, 0.35f, 4.0f, 58.0f, white);
+    C2D_DrawRectSolid(256.0f, 26.0f, 0.35f, 4.0f, 58.0f, white);
+    drawTextShadow("JOUER", 160.0f, 44.0f, 0.62f, CLR_TEXTE, 1);
+
+    /* selection de chapeau : fleches + nom */
+    C2D_DrawRectSolid(22.0f, 118.0f, 0.2f, 66.0f, 52.0f, btnBlue);
+    C2D_DrawRectSolid(232.0f, 118.0f, 0.2f, 66.0f, 52.0f, btnBlue);
+    drawTextShadow("<", 55.0f, 130.0f, 0.70f, CLR_TEXTE, 1);
+    drawTextShadow(">", 265.0f, 130.0f, 0.70f, CLR_TEXTE, 1);
+    drawTextShadow(hats[hatIdx].name, 160.0f, 130.0f, 0.50f, C2D_Color32(255, 230, 110, 255), 1);
+    drawTextShadow("Touche : chapeau / arriere", 160.0f, 180.0f, 0.42f, C2D_Color32(255, 255, 255, 210), 1);
+    drawTextShadow("L ou R = chapeau", 160.0f, 196.0f, 0.42f, CLR_TEXTE, 1);
+}
 
 static void drawTopScreen(void)
 {
@@ -873,6 +977,7 @@ int main(void)
     buildWorld();
     resetProjectiles();
     respawn();
+    plPos.y = 1.0f; /* demarre dans le menu : pose sur le sol de l'apercu */
     camYaw = -2.30f;
     camPitch = -0.20f;
 
@@ -900,6 +1005,36 @@ int main(void)
 
         /*--- cooldowns ---*/
         if (useCooldown > 0.0f) useCooldown -= dt;
+
+        /*============================ MENU ===========================*/
+        if (inMenu) {
+            menuSpin += dt * 0.6f;
+            if ((kDown & (KEY_L | KEY_DLEFT)) ||
+                tapRect(kDown, &touch, 22.0f, 118.0f, 88.0f, 170.0f)) {
+                hatIdx--;
+                if (hatIdx < 0) hatIdx = HAT_COUNT - 1;
+            }
+            if ((kDown & (KEY_R | KEY_DRIGHT)) ||
+                tapRect(kDown, &touch, 232.0f, 118.0f, 298.0f, 170.0f)) {
+                hatIdx++;
+                if (hatIdx >= HAT_COUNT) hatIdx = 0;
+            }
+            if ((kDown & (KEY_A | KEY_START)) ||
+                tapRect(kDown, &touch, 60.0f, 26.0f, 260.0f, 84.0f)) {
+                inMenu = false;
+                respawn(); /* place le joueur sur la vraie carte */
+                camYaw = -2.30f;
+                camPitch = -0.20f;
+                walkPhase = 0.0f;
+            }
+        } else {
+        /*============================ JEU ===========================*/
+        /*--- retour au menu (SELECT) ---*/
+        if (kDown & KEY_SELECT) {
+            inMenu = true;
+            respawn();
+            plPos.y = 1.0f; /* posé sur le sol de l'apercu */
+        }
 
         /*--- L/R : utiliser l'objet ---*/
         if ((kDown & KEY_L) || (kDown & KEY_R)) {
@@ -1076,12 +1211,33 @@ int main(void)
             g_camZ = plPos.z - g_fwdZ * CAM_DIST;
             if (g_camY < 0.4f) g_camY = 0.4f;
         }
+        } /* fin du bloc "en jeu" */
 
-        /*--- rendu ---*/
+        /*--- rendu : menu ou jeu ---*/
+        if (inMenu) {
+            /* aperdu : le perso tourne au centre, chapeau visible */
+            menuSpin += dt * 0.6f;
+            camYaw = menuSpin;
+            camPitch = -0.30f;
+            computeCameraBasis();
+            g_camX = plPos.x - g_fwdX * 6.0f;
+            g_camY = plPos.y + 1.60f - g_fwdY * 6.0f;
+            g_camZ = plPos.z - g_fwdZ * 6.0f;
+            if (g_camY < 0.4f) g_camY = 0.4f;
+        } else {
+            menuSpin = camYaw; /* reprise propre du jeu */
+        }
+
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C2D_Prepare();
-        drawTopScreen();
-        drawBottomScreen();
+        if (inMenu) {
+            plPos.y = 1.0f; /* sol de l'apercu a y=1 */
+            drawMenuTop();
+            drawMenuBottom();
+        } else {
+            drawTopScreen();
+            drawBottomScreen();
+        }
         C3D_FrameEnd(C3D_FRAME_SYNCDRAW);
     }
 
