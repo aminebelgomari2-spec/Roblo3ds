@@ -325,6 +325,72 @@ static bool projectPoint(float wx, float wy, float wz, float* px, float* py)
     return true;
 }
 
+/* plan proche pour le clipping des faces (bloc/perso passes si proche
+   de la camera qu'un coin se retrouve derriere elle) */
+#define NEAR_CLIP_Z 0.15f
+
+/* dessine un quad 3D (4 sommets, 2 triangles) AVEC clipping : si la face
+   coupe le plan proche (un coin derriere la caméra), on la coupe au bon
+   endroit au lieu de la faire disparaitre entierement (trous triangulaires). */
+static bool drawQuad3D(const Vec3 v[4], u32 col, float depth)
+{
+    float vxv[4], vyv[4], vzv[4];
+    float px[8], py[8];
+    bool keep[4];
+    bool any = false, all = true;
+    int n = 0;
+    int i;
+
+    for (i = 0; i < 4; i++) {
+        float wx = v[i].x - g_camX, wy = v[i].y - g_camY, wz = v[i].z - g_camZ;
+        vxv[i] = wx * g_rightX + wy * g_rightY + wz * g_rightZ;
+        vyv[i] = wx * g_upX + wy * g_upY + wz * g_upZ;
+        vzv[i] = wx * g_fwdX + wy * g_fwdY + wz * g_fwdZ;
+        keep[i] = (vzv[i] >= NEAR_CLIP_Z);
+        if (keep[i]) any = true; else all = false;
+    }
+    /* tous les coins derriere la camera -> rien a dessiner */
+    if (!any) return false;
+
+    /* tout devant -> projection directe, non clippee */
+    if (all) {
+        for (i = 0; i < 4; i++) {
+            px[i] = 200.0f + vxv[i] / vzv[i] * FOCAL;
+            py[i] = 120.0f - vyv[i] / vzv[i] * FOCAL;
+        }
+        C2D_DrawTriangle(px[0], py[0], col, px[1], py[1], col, px[2], py[2], col, depth);
+        C2D_DrawTriangle(px[1], py[1], col, px[2], py[2], col, px[3], py[3], col, depth);
+        return true;
+    }
+
+    /* clip : parcourt les 4 cotes du quad, construit le polygone visible */
+    for (i = 0; i < 4; i++) {
+        int j = (i + 1) & 3;
+        bool ka = keep[i], kb = keep[j];
+        if (ka) {
+            float z = vzv[i];
+            px[n] = 200.0f + vxv[i] / z * FOCAL;
+            py[n] = 120.0f - vyv[i] / z * FOCAL;
+            n++;
+        }
+        if (ka != kb) {
+            float t = (NEAR_CLIP_Z - vzv[i]) / (vzv[j] - vzv[i]);
+            float ix = vxv[i] + t * (vxv[j] - vxv[i]);
+            float iy = vyv[i] + t * (vyv[j] - vyv[i]);
+            px[n] = 200.0f + ix / NEAR_CLIP_Z * FOCAL;
+            py[n] = 120.0f - iy / NEAR_CLIP_Z * FOCAL;
+            n++;
+        }
+        if (n >= 8) break;
+    }
+    if (n < 3) return false;
+
+    /* eventail de triangles a partir du point 0 */
+    for (i = 1; i + 1 < n; i++)
+        C2D_DrawTriangle(px[0], py[0], col, px[i], py[i], col, px[i + 1], py[i + 1], col, depth);
+    return true;
+}
+
 /* distance d'un point a la camera -> valeur de profondeur citro2d */
 static float depthFor(float wx, float wy, float wz)
 {
@@ -333,18 +399,6 @@ static float depthFor(float wx, float wy, float wz)
     float depth = 0.95f - d * DEPTH_UNIT;
     if (depth < -0.90f) depth = -0.90f;
     return depth;
-}
-
-/* dessine un quad 3D (4 sommets, 2 triangles) */
-static void drawQuad3D(const Vec3 v[4], u32 col, float depth)
-{
-    float px[4], py[4];
-    int i;
-    for (i = 0; i < 4; i++)
-        if (!projectPoint(v[i].x, v[i].y, v[i].z, &px[i], &py[i])) return;
-
-    C2D_DrawTriangle(px[0], py[0], col, px[1], py[1], col, px[2], py[2], col, depth);
-    C2D_DrawTriangle(px[1], py[1], col, px[2], py[2], col, px[3], py[3], col, depth);
 }
 
 /* taille du bloc : 1.0 unite. dir : 0 +Y, 1 -Y, 2 +X, 3 -X, 4 +Z, 5 -Z */
@@ -534,9 +588,11 @@ static void drawPlayer(void)
     /* axe lateral du corps (perpendiculaire a son regard) */
     float brx = cosf(plYaw), brz = -sinf(plYaw);
 
-    /* jambes */
-    drawBoxYaw(plPos.x, plPos.y + 0.30f, plPos.z, 0.30f, 0.60f, 0.30f, plYaw, 1.0f,
-               pants, pants, pants);
+    /* jambes : DEUX jambes separees (avant : une seule boite = "une jambe") */
+    drawBoxYaw(plPos.x - brx * 0.10f, plPos.y + 0.30f, plPos.z - brz * 0.10f,
+               0.22f, 0.60f, 0.24f, plYaw, 1.0f, pants, pants, pants);
+    drawBoxYaw(plPos.x + brx * 0.10f, plPos.y + 0.30f, plPos.z + brz * 0.10f,
+               0.22f, 0.60f, 0.24f, plYaw, 1.0f, pants, pants, pants);
     /* torse */
     drawBoxYaw(plPos.x, plPos.y + 1.05f, plPos.z, 0.60f, 0.90f, 0.34f, plYaw, 1.0f,
                shadeColor(shirt, 0.8f), shirt, shirt);
@@ -803,7 +859,7 @@ int main(void)
 {
     gfxInitDefault();
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
-    C2D_Init(12288);
+    C2D_Init(24576); /* marge pour toutes les faces visibles d'une frame */
     C2D_Prepare();
 
     g_top = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
@@ -900,8 +956,8 @@ int main(void)
         float hw = (float)cp.dx, hv = (float)cp.dy;
         if (hw < 30.0f && hw > -30.0f) hw = 0.0f;
         if (hv < 30.0f && hv > -30.0f) hv = 0.0f;
-        float mx = g_rightX * hw - g_fwdX * hv;
-        float mz = g_rightZ * hw - g_fwdZ * hv;
+        float mx = g_rightX * hw + g_fwdX * hv;   /* +hv = pousser le pad vers l'avant */
+        float mz = g_rightZ * hw + g_fwdZ * hv;
         float mlen = sqrtf(mx * mx + mz * mz);
         if (mlen > 0.001f) {
             mx = (mx / mlen) * WALK_SPEED;
@@ -1035,3 +1091,4 @@ int main(void)
     gfxExit();
     return 0;
 }
+
