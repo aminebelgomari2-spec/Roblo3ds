@@ -117,11 +117,14 @@ typedef struct {
     bool isTall;     /* haut de forme : haut cylindrique */
 } Hat;
 
+/* NB : valeurs RGBA32 precalculees a la main car C2D_Color32() n'est pas
+   une expression constante pour gcc (cast volatile interne) -> impossible
+   dans un initialiseur statique. format : 0xAABBGGRR (r,g,b,a). */
 static const Hat hats[4] = {
-    { "Aucun",         C2D_Color32(0, 0, 0, 0),         false, false, false },
-    { "Casquette",     C2D_Color32(214, 58, 58, 255),   true,  false, false },
-    { "Couronne",      C2D_Color32(250, 204, 60, 255),  false, true,  false },
-    { "Haut de forme", C2D_Color32(30, 30, 36, 255),    false, false, true  },
+    { "Aucun",         0x00000000,   false, false, false }, /* (0,0,0,0)        */
+    { "Casquette",     0xFF3A3AD6,   true,  false, false }, /* (214, 58, 58)    */
+    { "Couronne",      0xFF3CCCFA,   false, true,  false }, /* (250, 204, 60)   */
+    { "Haut de forme", 0xFF241E1E,   false, false, true  }, /* (30, 30, 36)     */
 };
 static const int HAT_COUNT = 4;
 static int hatIdx = 0;
